@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 /**
@@ -26,12 +27,21 @@ public class BusStopsCallBack implements InvocationCallback<Response> {
         ObjectMapper mapper = new ObjectMapper();
         try {
             BusStop[] stops = mapper.readValue(response.readEntity(String.class), BusStop[].class);
-            System.out.println(String.format("Got %d busstops nearby", stops.length));
 
-            for(int i = 0; i< stops.length && i<10;i++) {
-                BusStop stop = stops[i];
-                boolean isLast = stop == stops[stops.length -1];
-                new Thread(new FindBusLinesForStop(stop.getId(), listener, isLast)).start();
+            // Consider only bus stops
+            ArrayList<BusStop> validStops = new ArrayList<>();
+            for(BusStop stop : stops) {
+                if (stop.getPlaceType().equals("Stop")) {
+                    validStops.add(stop);
+                }
+            }
+
+            System.out.println(String.format("Got %d busstops nearby", validStops.size()));
+
+            // The API does not return stops by proximity if a location is not given
+            // Therefore it is not wise to limit the stops to 10 here
+            for (BusStop stop : validStops) {
+                new Thread(new FindBusLinesForStop(stop.getId(), listener, validStops.size())).start();
             }
         } catch (IOException e) {
             listener.failedGettingTrips(e);

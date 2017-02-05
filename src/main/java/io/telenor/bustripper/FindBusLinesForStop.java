@@ -23,12 +23,12 @@ public class FindBusLinesForStop implements Runnable {
     private Client client;
     private String stopId;
     private TripsCallback listener;
-    private boolean last;
+    private int totalStops;
 
-    public FindBusLinesForStop(String stopId, TripsCallback callback, boolean last) {
+    public FindBusLinesForStop(String stopId, TripsCallback callback, int totalStops) {
         this.stopId = stopId;
         this.listener = callback;
-        this.last = last;
+        this.totalStops = totalStops;
     }
 
     public void run() {
@@ -45,7 +45,7 @@ public class FindBusLinesForStop implements Runnable {
                 .request(MediaType.APPLICATION_JSON);
 
         final AsyncInvoker asyncInvoker = invocationBuilder.async();
-        asyncInvoker.get(new BusTripsCallBack(target, listener, last));
+        asyncInvoker.get(new BusTripsCallBack(target, listener, totalStops));
 
     }
 

@@ -1,5 +1,6 @@
 package io.telenor.bustripper;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -16,31 +17,32 @@ public class BusTripsCallBack implements InvocationCallback<Response> {
     ObjectMapper mapper = new ObjectMapper();
     String url;
     private TripsCallback listener;
-    private boolean last;
+    private int totalStops;
 
-    public BusTripsCallBack(String url, TripsCallback callback, boolean last) {
+    public BusTripsCallBack(String url, TripsCallback callback, int totalStops) {
         this.url = url;
         this.listener = callback;
-        this.last = last;
+        this.totalStops = totalStops;
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
 
     public void completed(Response response) {
         ObjectMapper mapper = new ObjectMapper();
         String content = response.readEntity(String.class);
+        if (content == null || content.isEmpty()) {
+            // Bubble up the empty content so that the aggregator can keep track
+            // since this was expected to be a valid response
+            listener.gotTrips(null, totalStops);
+        } else {
+            try {
+                BusTrip[] trips = mapper.readValue(content, BusTrip[].class);
+                HashSet set = new HashSet(Arrays.asList(trips));
+                listener.gotTrips(set, totalStops);
 
-        try {
-            BusTrip[] trips = mapper.readValue(content, BusTrip[].class);
-            HashSet set = new HashSet(Arrays.asList(trips));
-            if(!set.isEmpty())
-                listener.gotTrips(set, last);
-
-        } catch (IOException e) {
-            if(last) {
+            } catch (IOException e) {
                 listener.failedGettingTrips(e);
             }
         }
-
     }
 
     public void failed(Throwable throwable) {

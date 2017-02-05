@@ -9,15 +9,87 @@ Your assignment for the first hour of the day is;
 1. Bugs have been filed on the client not supporting input of place names with characters other than letters
    (examples are 'St. Hanshaugen' or 'Telenor Fornebu'). Can you fix this?
 
+   URI encoding coupled with punctuation removal solved the issue.
+   The API does not support any form of punctuation, therefore they are simply removed using
+   unicode aware regex. Since the API searches by similarities, this returns the expected
+   results to the user
+
 2. The previous developer had intended that pressing both "q" and just <enter> at the query prompt should stop the
    program. It turns out only one of them works. Can you fix the other?
+
+   He was using the "==" operator. It compares instances (if they are the same instance)
+   The functionality was replaced with "equals()"
 
 3. On some searches ('Fornebu' or 'Oslo'), more than 10 results are printed and the cursor is not positioned correctly.
    Can you fix this?
 
+   This was fixed by signaling the aggregator callback (BustripWaiter) how many responses are expected
+   The aggregator will then wait for all of them before processing.
+   Also, to solve edge cases, the aggregator is notified if an empty set or empty response are given,
+   so that it can keep track.
+
 4. Perform a code review of the current code. Make notes of What works, identify bugs and suggest improvements.
    Prepare a discussion around your findings. There is no need to code corrections here.
+
+   Since you mentioned this should be done in a couple of hours, I figured you were interested in only the issues
+   that popped out immediately to me.
+
+   First, the nitpickings:
+   - Variables don't follow Java convention. For instance, "searchterm" should be "searchTerm". There are other
+   examples throughout the code.
+   - I might be wrong, but I thought the package was supposed to be com.telenordigital. Ignore if I'm wrong :)
+   But also, everything is clumped in a single package; maybe a logical organization should be used.
+   - Lack of comments in most of the code
+   - Variables that are set in the constructor and not meant to change should be marked as final. This will avoid
+   future unpredictable bugs and problems.
+   - There are cases where the scope of the variables are not proper. You should always use the most stringent
+   scope possible. For instance, BusTripsCallback has default variables. They are visible within the whole package,
+   which in this case is the the whole application!
+   - Why so many class declarations in Main.java? This breaks the single responsibility of the Main class and
+   highly couples the functionality. See below for extra comments.
+
+   Some higher level stuff:
+   - The parallelism is very weak. A thread is called followed by a "waitForCompletion". What's the point? If it
+   is to get out of the main thread, there is no need for that since the main function already breaks away.
+   - Talking about that, there is no need to break away in the main function. In fact, the thread that it launches
+   uses System.out and System.in extensively, which in this case should be made as serial as possible to avoid
+   jumbling and confusion. Let the hard work and API fetches be threaded, but the main input/output should be
+   on the main thread.
+   - Talking about System.out, maybe a logging library should be used. This would add extra functionality and
+   security. As mentioned below, on issue #5, Lanterna could be a viable terminal based solution.
+   - Talking about replacing functionality, there is high coupling throughout the code. The original developer
+   had this in mind initially by cascading the callback "BustripWaiter" through the calls, but forgot about it
+   later on, making hard instantiations of "BusStopsCallback", "FindBusLinesForStops", etc. By using Dependency
+   Inversion, different functionality can be plugged in to those callbacks.
+   - The Date does not consider timezones. Let's say I'm arriving in Norway coming from the US, and I want to
+   plan my trip back home from the airport, the Date will be passed with my local timezone. Additionally, the app
+   makes no comments about which timezone the results are in.
+
+   - There is good single responsibility overall. With many objects working on specific tasks. The exception is
+   the Main class; it does input, output, sorting, exception handling, thread management. As mentioned before,
+   if we are using a library to communicate with the terminal, it would be nice to have the terminal interfacing
+   classes (InputGatherer and BustripWaiter) separated, for instance.
+
+   - There was a magical number in BusStopsCallback that limited the for loop. Two problems with this:
+   The first is that it is a magical number; cryptic. If it were to be used, it would be better to make a
+   "private static final int" with a proper name to identify its purpose.
+   The second problem is that this limitation will hinder the expected functionality of the app. The API says
+   that the places will be listed by geographically nearest IF the location is given. The original developer
+   had good intentions by limiting only the closest stops, but failed to send a location. Meaning that a very
+   close bus stop might be hidden by this limit purely because of the ordering.
 
 5. Still there are complaints, that in situations where network is slow, the output of the bus lines are messy.
    What can be the explanations of these? Plan (but don't code) what needs to be changed to be more robust against
    slow networks.
+
+   The code used to display results whenever a "done" flag was set or whenever there were more than "maxtrips" in
+   the aggregating set. This would cause results to be displayed before considering all the possibilities and
+   also would execute multiple times after the set was big enough (larger than 10) but the "done" flag wasn't set.
+   This would cause a messy output. Not properly ordered.
+
+   While solving issue #3, this was mitigated. Though, it will not be responsive, i.e. it will only show results
+   after all the trips are gathered.
+   To solve this issue, some sort of dynamic terminal should be used (something like C's curses lib), where the results
+   can be shown, and modified as new results are gathered. With this method, there will always be ten results, ordered
+   amongst them. But, as new ones came in, the print output can be replaced by a new, more recent list.
+   Lanterna could be an option for this solution.

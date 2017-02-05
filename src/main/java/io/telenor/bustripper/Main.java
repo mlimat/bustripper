@@ -17,12 +17,13 @@ public class Main {
             private boolean done = false;
             private Set<BusTrip> allTrips = new HashSet<BusTrip>();
             private static int maxtrips = 10;
+            private int stopsCount;
 
             @Override
-            public synchronized void gotTrips(Set<BusTrip> trips, boolean done) {
+            public synchronized void gotTrips(Set<BusTrip> trips, int totalStops) {
+                stopsCount++;
                 allTrips.addAll(trips);
-
-                if(done || allTrips.size() >= maxtrips) {
+                if(stopsCount == totalStops) {
                     if (allTrips.isEmpty()) {
                         System.out.println("No trips found!");
                     }
@@ -61,7 +62,7 @@ public class Main {
                     System.out.print("> ");
                     try {
                         String searchterm = in.readLine();
-                        if("q" == searchterm || searchterm.length() == 0) {
+                        if("q".equals(searchterm) || searchterm.length() == 0) {
                             System.exit(0);
                         }
                         System.out.println("Looking up " + searchterm);
